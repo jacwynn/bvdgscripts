@@ -5,7 +5,7 @@ import re
 df = pd.read_csv('./BVDG-VET/vet-med-data-feed-filtered.csv', encoding='latin1')
 
 # Define a list of animal names you want to match
-animal_names = ['animal', 'dog', 'cat']
+animal_names = ['animal', 'sea life', 'amphibians', 'reptiles', 'insects', 'arachnids', 'seashore', 'dog', 'dogs', 'cat', 'cats', 'bird', 'dolphin', 'butterfly', 'snake', 'ladybuy', 'lady bug', 'dragonfly', 'lizard', 'turtle', 'bear', 'salmon', 'horse', 'frog', 'fish']
 
 # Create a regex pattern from the animal names
 animal_pattern = '|'.join(r'\b{}\b'.format(re.escape(animal)) for animal in animal_names)

@@ -10,22 +10,33 @@ df = pd.read_csv('./BVDG-VET/vet-med-data-feed.csv')
 
 df['Handle'] = df['Description'].str.replace(' ', '-').str.replace('/', '-') + '-' + df['Item'].str.replace(' ', '-')
 df['Title'] = df['Description']
-df['Description'] = df['ListOfSpecs']
+# Combine ListOfSpecs with Weight information
+df['Description'] = df['ListOfSpecs'] + '|Average Weight: ' + df['Weight'].astype(str) + 'GM'
 df['Vendor'] = 'BVDandG'
 df['Type'] = df['Item_Type'].str.split(': ').str[1]
-df['Tags'] = df['Categories'].fillna('').str.replace(r'\\|;', ', ').str.split(', ').apply(lambda x: ', '.join(sorted(set(x)))).str.strip(', ')
+# df['Tags'] = df['Categories'].fillna('').str.replace(r'\\|;', ', ').str.split(', ').apply(lambda x: ', '.join(sorted(set(x)))).str.strip(', ')
+specs_tags = df['ListOfSpecs'].fillna('').str.split('|').apply(
+    lambda x: [item.split(':')[1].strip() if ':' in item else item.strip() for item in x]
+)
+df['Tags'] = df.apply(
+    lambda row: ', '.join(sorted(set(
+        # Original Categories tags - clean up semicolons and backslashes
+        (row['Categories'].replace(';', ',').replace('\\', ',').split(',') if pd.notna(row['Categories']) else []) +
+        # New specs tags
+        (specs_tags.loc[row.name] if isinstance(specs_tags.loc[row.name], list) else [])
+    ))).strip(', '),
+    axis=1
+)
 df['Published'] = 'TRUE'
 df['Variant SKU'] = df['Item']
 df['Variant Grams'] = df['Weight']
 df['Variant Inventory Tracker'] = 'shopify'
 df['Variant Inventory Qty'] = df['Qty_Avail']
 
-# df['Variant Price'] = df['Price'] - I don't think we need a price at this point
 df['Variant Compare At Price'] = df['MSRP']
 
 image_columns = ['Image{}Link'.format(i) for i in range(1, 10)]
 df['Image Src'] = df[image_columns].apply(lambda x: '; '.join(x.dropna().astype(str)), axis=1)
-# df['base_image'] = df['base_image'].apply(lambda x: 'https://google.com' + str(x))
 
 shopify_columns = [
     'Handle', 'Title', 'Description', 'Vendor', 'Type', 'Tags', 'Published', 'Variant SKU', 'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant Compare At Price', 'Variant Grams', 'Image Src'
