@@ -1,38 +1,77 @@
 import pandas as pd
 import re
+import sys
+from datetime import datetime
 
-# Read the original CSV
-df = pd.read_csv('./BVDG-VET/vet-med-data-feed-filtered.csv', encoding='latin1')
+def run(input_path):
+    """
+    Filter raw vendor feed to only animal-related products.
 
-# Define a list of animal names you want to match
-animal_names = ['animal', 'sea life', 'amphibians', 'reptiles', 'insects', 'arachnids', 'seashore', 'dog', 'dogs', 'cat', 'cats', 'bird', 'dolphin', 'butterfly', 'snake', 'ladybuy', 'lady bug', 'dragonfly', 'lizard', 'turtle', 'bear', 'salmon', 'horse', 'frog', 'fish']
+    Args:
+        input_path: path to raw vet-med CSV
 
-# Create a regex pattern from the animal names
-animal_pattern = '|'.join(r'\b{}\b'.format(re.escape(animal)) for animal in animal_names)
+    Returns:
+        path to filtered CSV with only animal products
+    """
+    try:
+        df = pd.read_csv(input_path, encoding='latin1')
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    except Exception as e:
+        raise ValueError(f"Error reading input file: {e}")
 
-# Function to check if categories contain animal names
-def has_animal_category(categories):
-    if pd.isna(categories):
-        return False
-    return bool(re.search(animal_pattern, categories, re.IGNORECASE))
+    if 'Categories' not in df.columns:
+        raise ValueError("Input CSV must have a 'Categories' column")
 
-# Filter the DataFrame to keep only rows with animal categories
-df_filtered = df[df['Categories'].apply(has_animal_category)]
+    print(f"Filtering {len(df)} rows for animal-related products...")
 
-# Process the Categories column for the filtered DataFrame
-def process_categories(categories):
-    if pd.isna(categories):
-        return ''
-    animal_categories = [cat.strip() for cat in re.split(r'\\|;|,', categories) 
-                         if re.search(animal_pattern, cat, re.IGNORECASE)]
-    return ', '.join(sorted(set(animal_categories)))
+    # Animal keywords to match
+    animal_names = [
+        'animal', 'sea life', 'amphibians', 'reptiles', 'insects', 'arachnids',
+        'seashore', 'dog', 'dogs', 'cat', 'cats', 'bird', 'dolphin', 'butterfly',
+        'snake', 'ladybug', 'dragonfly', 'lizard', 'turtle', 'bear', 'salmon',
+        'horse', 'frog', 'fish'
+    ]
 
-# Apply the processing to the Tags column
-df_filtered['Tags'] = df_filtered['Categories'].apply(process_categories)
+    animal_pattern = '|'.join(r'\b{}\b'.format(re.escape(animal)) for animal in animal_names)
 
-# Save the filtered DataFrame to a new CSV
-df_filtered.to_csv('filtered_animal_categories.csv', index=False, encoding='utf-8')
+    def has_animal_category(categories):
+        if pd.isna(categories):
+            return False
+        return bool(re.search(animal_pattern, categories, re.IGNORECASE))
 
-# Print the number of rows in the original and filtered DataFrames
-print("Original CSV rows: {}".format(len(df)))
-print("Filtered CSV rows: {}".format(len(df_filtered)))
+    df_filtered = df[df['Categories'].apply(has_animal_category)]
+
+    def process_categories(categories):
+        if pd.isna(categories):
+            return ''
+        animal_categories = [
+            cat.strip() for cat in re.split(r'[\\|;,]', categories)
+            if re.search(animal_pattern, cat, re.IGNORECASE)
+        ]
+        return ', '.join(sorted(set(animal_categories)))
+
+    df_filtered = df_filtered.copy()
+    df_filtered['Tags'] = df_filtered['Categories'].apply(process_categories)
+
+    # Write output with date stamp
+    current_datetime = datetime.now()
+    output_path = './BVDG-VET/filtered-vet-categories-{}.csv'.format(
+        current_datetime.strftime('%Y%m%d')
+    )
+
+    df_filtered.to_csv(output_path, index=False, encoding='utf-8')
+
+    print(f"✓ Filtered {len(df_filtered)} rows out of {len(df)} original")
+    print(f"✓ Output: {output_path}")
+
+    return output_path
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Usage: python filter-vet-categories.py <input_csv>")
+        sys.exit(1)
+
+    output = run(sys.argv[1])
+    print(f"Done: {output}")
