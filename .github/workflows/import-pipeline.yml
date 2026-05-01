@@ -1,0 +1,100 @@
+name: BVDG-VET Import Pipeline
+
+on:
+  schedule:
+    # Run every Monday at 9:00 AM UTC (adjust timezone as needed)
+    - cron: '0 9 * * 1'
+
+  workflow_dispatch:
+    inputs:
+      animals_only:
+        description: 'Filter to animal products only'
+        required: false
+        default: 'false'
+
+env:
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download vendor feed from FTP
+        run: |
+          python3 << 'EOF'
+          import ftplib
+          import os
+
+          # FTP Configuration (UPDATE WITH REAL CREDENTIALS)
+          FTP_SERVER = "${{ secrets.FTP_SERVER }}"
+          FTP_USER = "${{ secrets.FTP_USER }}"
+          FTP_PASS = "${{ secrets.FTP_PASS }}"
+          FTP_FILE_PATH = "${{ secrets.FTP_FILE_PATH }}"
+
+          OUTPUT_FILE = "./BVDG-VET/vet-med-data-feed.csv"
+          os.makedirs("./BVDG-VET", exist_ok=True)
+
+          try:
+              print(f"Connecting to FTP server: {FTP_SERVER}")
+              with ftplib.FTP(FTP_SERVER, FTP_USER, FTP_PASS) as ftp:
+                  print("Connected! Downloading file...")
+                  with open(OUTPUT_FILE, 'wb') as f:
+                      ftp.retrbinary(f'RETR {FTP_FILE_PATH}', f.write)
+              print(f"✓ Downloaded to {OUTPUT_FILE}")
+          except Exception as e:
+              print(f"❌ FTP download failed: {e}")
+              raise
+          EOF
+
+      - name: Run pipeline (all products)
+        if: github.event.inputs.animals_only == 'false' || github.event_name == 'schedule'
+        run: |
+          python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv
+
+      - name: Run pipeline (animals only)
+        if: github.event.inputs.animals_only == 'true'
+        run: |
+          python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only
+
+      - name: Upload batches to Google Drive
+        uses: dawidd6/action-upload-to-google-drive@v6
+        with:
+          credentials: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+          name: BVDG-VET-Imports
+          path: ./BVDG-VET/ready-to-import/
+          parents: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          overwrite: 'false'
+
+      - name: Upload pipeline output as artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: matrixify-batches-${{ github.run_id }}
+          path: ./BVDG-VET/ready-to-import/
+          retention-days: 30
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Pipeline completed successfully!"
+          echo "Batches ready in Google Drive folder: BVDG-VET-Imports"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Pipeline failed!"
+          exit 1
