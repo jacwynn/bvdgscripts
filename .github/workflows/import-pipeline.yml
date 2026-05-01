@@ -70,58 +70,6 @@ jobs:
         run: |
           python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only
 
-      - name: Write Google credentials to file
-        run: |
-          mkdir -p /tmp
-          echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}' > /tmp/gd_creds.json
-
-      - name: Upload batches to Google Drive
-        run: |
-          python3 << 'EOF'
-          import os
-          import json
-          from google.oauth2.service_account import Credentials
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaFileUpload
-
-          # Load service account credentials from file
-          with open('/tmp/gd_creds.json', 'r') as f:
-              creds_dict = json.load(f)
-
-          creds = Credentials.from_service_account_info(
-              creds_dict,
-              scopes=['https://www.googleapis.com/auth/drive']
-          )
-
-          # Build Drive API client
-          drive_service = build('drive', 'v3', credentials=creds)
-          parent_folder_id = "${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}"
-
-          # Upload all batch files
-          batch_dir = './BVDG-VET/ready-to-import/'
-          for root, dirs, files in os.walk(batch_dir):
-              for file in files:
-                  if file.endswith('.csv'):
-                      file_path = os.path.join(root, file)
-                      print(f"Uploading {file}...")
-
-                      file_metadata = {
-                          'name': file,
-                          'parents': [parent_folder_id]
-                      }
-
-                      media = MediaFileUpload(file_path, mimetype='text/csv')
-                      file_obj = drive_service.files().create(
-                          body=file_metadata,
-                          media_body=media,
-                          fields='id'
-                      ).execute()
-
-                      print(f"  ✓ Uploaded: {file_obj['id']}")
-
-          print("\n✓ All batches uploaded to Google Drive!")
-          EOF
-
       - name: Upload pipeline output as artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -134,7 +82,8 @@ jobs:
         if: success()
         run: |
           echo "✅ Pipeline completed successfully!"
-          echo "Batches ready in Google Drive folder: BVDG-VET-Imports"
+          echo "Download batches from GitHub Actions artifacts"
+          echo "Then upload to Google Drive or Dropbox for Matrixify"
 
       - name: Notify on failure
         if: failure()
