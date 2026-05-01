@@ -70,6 +70,11 @@ jobs:
         run: |
           python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only
 
+      - name: Write Google credentials to file
+        run: |
+          mkdir -p /tmp
+          echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}' > /tmp/gd_creds.json
+
       - name: Upload batches to Google Drive
         run: |
           python3 << 'EOF'
@@ -79,10 +84,14 @@ jobs:
           from googleapiclient.discovery import build
           from googleapiclient.http import MediaFileUpload
 
-          # Parse service account credentials
-          creds_json = "${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}"
-          creds_dict = json.loads(creds_json)
-          creds = Credentials.from_service_account_info(creds_dict, scopes=['https://www.googleapis.com/auth/drive'])
+          # Load service account credentials from file
+          with open('/tmp/gd_creds.json', 'r') as f:
+              creds_dict = json.load(f)
+
+          creds = Credentials.from_service_account_info(
+              creds_dict,
+              scopes=['https://www.googleapis.com/auth/drive']
+          )
 
           # Build Drive API client
           drive_service = build('drive', 'v3', credentials=creds)
