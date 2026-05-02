@@ -116,6 +116,9 @@ jobs:
                   # Read CSV
                   df = pd.read_csv(batch_file)
 
+                  # Replace NaN with empty strings (JSON doesn't support NaN)
+                  df = df.fillna('')
+
                   # Get or create worksheet
                   try:
                       ws = sheet.worksheet(sheet_title)
@@ -132,7 +135,9 @@ jobs:
 
                   # Write data rows in batches (Sheets API has rate limits)
                   for idx, row in df.iterrows():
-                      ws.append_row(row.tolist())
+                      # Convert to list and handle any remaining non-JSON-compliant values
+                      row_data = ['' if pd.isna(val) else str(val) for val in row.tolist()]
+                      ws.append_row(row_data)
 
                   print(f"✓ Uploaded {batch_name} → {sheet_title} ({len(df)} rows)")
 
