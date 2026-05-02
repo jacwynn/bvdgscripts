@@ -151,9 +151,12 @@ Examples:
         print("\n=== Stage 4: Customize Categories ===")
         output_files = []
 
+        # Auto-enable vet_medicine if animals_only is used
+        vet_medicine_flag = args.vet_medicine or args.animals_only
+
         for category_path in sorted(category_files):
             try:
-                output = customize_category(category_path, vet_medicine=args.vet_medicine)
+                output = customize_category(category_path, vet_medicine=vet_medicine_flag)
                 output_files.append(output)
             except Exception as e:
                 print(f"Error processing {category_path}: {e}")

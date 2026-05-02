@@ -138,7 +138,7 @@ def run(input_path, vet_medicine=False):
 
     # Update vendor based on vet_medicine flag
     if vet_medicine:
-        df['Vendor'] = df['Vendor'].apply(lambda x: x + ' - Vet Medicine' if x else 'Vet Medicine')
+        df['Vendor'] = 'Quality Gold - Vet Medicine'
     else:
         df['Vendor'] = 'Quality Gold'
 
