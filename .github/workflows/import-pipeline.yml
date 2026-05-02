@@ -70,6 +70,69 @@ jobs:
         run: |
           python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only
 
+      - name: Upload batches to Google Sheets
+        if: always()
+        run: |
+          python3 << 'EOF'
+          import gspread
+          from google.oauth2.service_account import Credentials
+          import json
+          import os
+          import pandas as pd
+          import glob
+
+          # Authenticate with service account
+          creds_json = "${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}"
+          creds = Credentials.from_service_account_info(
+              json.loads(creds_json),
+              scopes=['https://www.googleapis.com/auth/spreadsheets']
+          )
+          gc = gspread.authorize(creds)
+
+          # Open the sheet
+          SHEET_ID = "1nhrBaru4B7wq-cYJ5S4Zex1sVvrBuPN3FvL8qP03WRg"
+          sheet = gc.open_by_key(SHEET_ID)
+          print(f"✓ Connected to Google Sheet: {sheet.title}")
+
+          # Find all batch files
+          batch_dir = "./BVDG-VET/ready-to-import"
+          batch_files = sorted(glob.glob(os.path.join(batch_dir, "**/batch_*.csv"), recursive=True))
+
+          if not batch_files:
+              print("⚠ No batch files found to upload")
+          else:
+              for batch_file in batch_files:
+                  # Extract batch number from filename
+                  batch_name = os.path.basename(batch_file)
+                  batch_num = batch_name.replace("batch_", "").replace(".csv", "")
+                  sheet_title = f"batch_{batch_num}"
+
+                  # Read CSV
+                  df = pd.read_csv(batch_file)
+
+                  # Get or create worksheet
+                  try:
+                      ws = sheet.worksheet(sheet_title)
+                      print(f"  Using existing tab: {sheet_title}")
+                  except gspread.exceptions.WorksheetNotFound:
+                      ws = sheet.add_worksheet(title=sheet_title, rows=len(df) + 10, cols=len(df.columns))
+                      print(f"  Created new tab: {sheet_title}")
+
+                  # Clear existing data
+                  ws.clear()
+
+                  # Write headers
+                  ws.append_row(df.columns.tolist())
+
+                  # Write data rows in batches (Sheets API has rate limits)
+                  for idx, row in df.iterrows():
+                      ws.append_row(row.tolist())
+
+                  print(f"✓ Uploaded {batch_name} → {sheet_title} ({len(df)} rows)")
+
+              print(f"\n✓ All {len(batch_files)} batch files uploaded to Google Sheet")
+          EOF
+
       - name: Upload pipeline output as artifact
         if: always()
         uses: actions/upload-artifact@v4
