@@ -72,7 +72,12 @@ jobs:
 
       - name: Upload batches to Google Sheets
         if: always()
+        env:
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
         run: |
+          # Write credentials to temp file to avoid JSON parsing issues
+          echo "$GOOGLE_CREDS" > /tmp/google-creds.json
+
           python3 << 'EOF'
           import gspread
           from google.oauth2.service_account import Credentials
@@ -82,9 +87,10 @@ jobs:
           import glob
 
           # Authenticate with service account
-          creds_json = "${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}"
+          with open('/tmp/google-creds.json') as f:
+              creds_info = json.load(f)
           creds = Credentials.from_service_account_info(
-              json.loads(creds_json),
+              creds_info,
               scopes=['https://www.googleapis.com/auth/spreadsheets']
           )
           gc = gspread.authorize(creds)
