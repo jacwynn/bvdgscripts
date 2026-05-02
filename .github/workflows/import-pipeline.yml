@@ -130,14 +130,15 @@ jobs:
                   # Clear existing data
                   ws.clear()
 
-                  # Write headers
-                  ws.append_row(df.columns.tolist())
-
-                  # Write data rows in batches (Sheets API has rate limits)
+                  # Prepare all rows including headers
+                  all_rows = [df.columns.tolist()]
                   for idx, row in df.iterrows():
                       # Convert to list and handle any remaining non-JSON-compliant values
                       row_data = ['' if pd.isna(val) else str(val) for val in row.tolist()]
-                      ws.append_row(row_data)
+                      all_rows.append(row_data)
+
+                  # Append all rows at once (single API call instead of N calls)
+                  ws.append_rows(all_rows)
 
                   print(f"✓ Uploaded {batch_name} → {sheet_title} ({len(df)} rows)")
 
