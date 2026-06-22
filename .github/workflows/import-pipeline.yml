@@ -108,10 +108,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Remove old snapshots, keep only the new one
-          git rm -f BVDG-VET/previous-feed-snapshot-*.csv 2>/dev/null || true
+          # Untrack old snapshots from index without deleting from disk
+          git rm --cached BVDG-VET/previous-feed-snapshot-*.csv 2>/dev/null || true
 
-          # Stage and commit the new snapshot
+          # Stage the new snapshot
           git add BVDG-VET/previous-feed-snapshot-*.csv
           git diff --cached --quiet || git commit -m "chore: update feed snapshot [skip ci]"
           git push
