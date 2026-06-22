@@ -49,6 +49,7 @@ def run(new_feed_path, snapshot_path=None):
     new_df = pd.read_csv(new_feed_path, encoding="latin1")
     old_df = pd.read_csv(resolved_snapshot, encoding="latin1", usecols=["Item", "Price", "Qty_Avail"])
 
+    old_df = old_df.drop_duplicates(subset=["Item"], keep="last")
     old_df = old_df.rename(columns={"Price": "_old_Price", "Qty_Avail": "_old_Qty_Avail"})
 
     merged = new_df.merge(old_df, on="Item", how="left")
