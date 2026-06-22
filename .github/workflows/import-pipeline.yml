@@ -19,6 +19,9 @@ on:
 env:
   PYTHON_VERSION: '3.13'
 
+permissions:
+  contents: write
+
 jobs:
   pipeline:
     runs-on: ubuntu-latest
