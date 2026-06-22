@@ -1,2 +1,3 @@
 BVDG-VET/*
+!BVDG-VET/previous-feed-snapshot-*.csv
 __pycache__/*

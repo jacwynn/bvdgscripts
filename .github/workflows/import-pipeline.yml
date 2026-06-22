@@ -2,8 +2,8 @@ name: BVDG-VET Import Pipeline
 
 on:
   schedule:
-    # Run every Monday at 9:00 AM UTC (adjust timezone as needed)
-    - cron: '0 9 * * 1'
+    # Run every other day at 9:00 AM UTC
+    - cron: '0 9 */2 * *'
 
   workflow_dispatch:
     inputs:
@@ -11,6 +11,10 @@ on:
         description: 'Filter to animal products only'
         required: false
         default: 'false'
+      delta:
+        description: 'Only process products where price or inventory changed'
+        required: false
+        default: 'true'
 
 env:
   PYTHON_VERSION: '3.13'
@@ -61,14 +65,56 @@ jobs:
           EOF
 
       - name: Run pipeline (all products)
-        if: github.event.inputs.animals_only == 'false' || github.event_name == 'schedule'
+        if: github.event.inputs.animals_only != 'true'
         run: |
-          python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv
+          DELTA_FLAG=""
+          if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ github.event.inputs.delta }}" == "true" ]; then
+            DELTA_FLAG="--delta"
+          fi
+          python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv $DELTA_FLAG
 
       - name: Run pipeline (animals only)
         if: github.event.inputs.animals_only == 'true'
         run: |
-          python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only
+          DELTA_FLAG=""
+          if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ github.event.inputs.delta }}" == "true" ]; then
+            DELTA_FLAG="--delta"
+          fi
+          python3 pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only $DELTA_FLAG
+
+      - name: Output delta summary
+        run: |
+          STATS=./BVDG-VET/delta-stats.txt
+          if [ -f "$STATS" ]; then
+            TOTAL=$(grep "^total=" $STATS | cut -d= -f2)
+            KEPT=$(grep "^kept=" $STATS | cut -d= -f2)
+            NEW=$(grep "^new_items=" $STATS | cut -d= -f2)
+            CHANGES=$(grep "^price_inv_changes=" $STATS | cut -d= -f2)
+            SKIPPED=$(grep "^skipped=" $STATS | cut -d= -f2)
+            PCT=$(grep "^pct=" $STATS | cut -d= -f2)
+
+            echo "### Delta Filter Results" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total rows in feed | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| New items | $NEW |" >> $GITHUB_STEP_SUMMARY
+            echo "| Price / inventory changes | $CHANGES |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Rows to process (delta)** | **$KEPT ($PCT%)** |" >> $GITHUB_STEP_SUMMARY
+            echo "| Rows skipped (no change) | $SKIPPED |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Commit snapshot back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Remove old snapshots, keep only the new one
+          git rm -f BVDG-VET/previous-feed-snapshot-*.csv 2>/dev/null || true
+
+          # Stage and commit the new snapshot
+          git add BVDG-VET/previous-feed-snapshot-*.csv
+          git diff --cached --quiet || git commit -m "chore: update feed snapshot [skip ci]"
+          git push
 
       - name: Upload batches to Google Sheets
         if: always()

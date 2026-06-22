@@ -3,6 +3,7 @@
 BVDG-VET Shopify Import Pipeline
 
 Orchestrates the full product feed transformation:
+  Stage 0 (optional): Delta filter — only changed price/inventory rows
   Stage 1 (optional): Filter to animal products only
   Stage 2: Transform raw feed to Shopify root format
   Stage 3: Split root by category
@@ -13,6 +14,8 @@ Usage:
   python pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv
   python pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --animals-only
   python pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --vet-medicine
+  python pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --delta
+  python pipeline.py --input ./BVDG-VET/vet-med-data-feed.csv --delta --snapshot ./BVDG-VET/previous-feed-snapshot-20260601.csv
 """
 
 import argparse
@@ -23,6 +26,7 @@ from datetime import datetime
 
 from script import run as transform_feed
 from split import run as split_by_category
+from delta import run as delta_filter
 
 # Import modules with hyphens using importlib
 spec = importlib.util.spec_from_file_location("product_customization_script", "./product-customization-script.py")
@@ -113,6 +117,10 @@ Examples:
                        help='Filter to animal-related products only')
     parser.add_argument('--vet-medicine', action='store_true',
                        help='Add " - Vet Medicine" vendor suffix')
+    parser.add_argument('--delta', action='store_true',
+                       help='Only process products where price or inventory changed since last run')
+    parser.add_argument('--snapshot', default=None,
+                       help='Path to baseline snapshot CSV (used with --delta on first run)')
 
     args = parser.parse_args()
 
@@ -126,6 +134,11 @@ Examples:
         print("=" * 70)
 
         input_feed = args.input
+
+        # Stage 0: Delta filter (price/inventory changes only)
+        if args.delta:
+            print("\n=== Stage 0: Delta Filter (Changed Products Only) ===")
+            input_feed = delta_filter(input_feed, snapshot_path=args.snapshot)
 
         # Stage 1: Optional animal filter
         if args.animals_only:
@@ -174,6 +187,8 @@ Examples:
         print("PIPELINE COMPLETE ✓")
         print("=" * 70)
         print(f"Input: {args.input}")
+        if args.delta:
+            print(f"Mode: Delta (price/inventory changes only)")
         if args.animals_only:
             print(f"Mode: Animals only")
         if args.vet_medicine:
