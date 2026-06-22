@@ -140,6 +140,11 @@ Examples:
             print("\n=== Stage 0: Delta Filter (Changed Products Only) ===")
             input_feed = delta_filter(input_feed, snapshot_path=args.snapshot)
 
+            import pandas as pd
+            if len(pd.read_csv(input_feed)) == 0:
+                print("\n✅ No price or inventory changes since last run. Nothing to process.")
+                return 0
+
         # Stage 1: Optional animal filter
         if args.animals_only:
             print("\n=== Stage 1: Filter to Animal Products ===")
