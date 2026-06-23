@@ -144,10 +144,9 @@ jobs:
               print("⚠ No batch files found to upload")
           else:
               for batch_file in batch_files:
-                  # Extract batch number from filename
+                  # Use filename (minus extension) as sheet tab title e.g. "batch_1-anklets-bracelets"
                   batch_name = os.path.basename(batch_file)
-                  batch_num = batch_name.replace("batch_", "").replace(".csv", "")
-                  sheet_title = f"batch_{batch_num}"
+                  sheet_title = batch_name.replace(".csv", "")
 
                   # Read CSV
                   df = pd.read_csv(batch_file)

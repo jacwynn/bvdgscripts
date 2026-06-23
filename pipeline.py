@@ -59,12 +59,17 @@ def batch_for_matrixify(output_files, batch_size=5000):
         print("No files to batch")
         return []
 
-    # Read and combine all category files
+    # Read and combine all category files, tagging each row with its category
     dfs = []
     for path in output_files:
         if os.path.exists(path):
             try:
-                dfs.append(pd.read_csv(path))
+                df = pd.read_csv(path)
+                # Derive category name from filename (e.g. "anklets" from "updated-shopify_import-product-feed-anklets-20260622.csv")
+                filename = os.path.basename(path)
+                category = filename.replace("updated-shopify_import-product-feed-", "").rsplit("-", 1)[0]
+                df["_category"] = category
+                dfs.append(df)
             except Exception as e:
                 print(f"Warning: Could not read {path}: {e}")
 
@@ -89,11 +94,16 @@ def batch_for_matrixify(output_files, batch_size=5000):
         end_row = min(start_row + batch_size, total_rows)
         batch_df = combined_df.iloc[start_row:end_row]
 
-        batch_path = os.path.join(batch_dir, f'batch_{batch_num}.csv')
+        # Build filename from unique categories in this batch
+        categories = batch_df["_category"].unique().tolist()
+        category_suffix = "-".join(categories)
+        batch_df = batch_df.drop(columns=["_category"])
+
+        batch_path = os.path.join(batch_dir, f'batch_{batch_num}-{category_suffix}.csv')
         batch_df.to_csv(batch_path, index=False)
         batch_files.append(batch_path)
 
-        print(f"  ✓ Batch {batch_num}: rows {start_row+1}–{end_row} ({len(batch_df)} rows)")
+        print(f"  ✓ Batch {batch_num}: rows {start_row+1}–{end_row} ({len(batch_df)} rows) [{category_suffix}]")
         batch_num += 1
         start_row = end_row
 
