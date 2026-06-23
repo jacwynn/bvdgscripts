@@ -41,17 +41,29 @@ jobs:
           pip install -r requirements.txt
 
       - name: Download vendor feed from FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_FILE_PATH: ${{ secrets.FTP_FILE_PATH }}
         run: |
           mkdir -p ./BVDG-VET
+
+          # Write credentials to netrc to safely handle special characters
+          echo "machine $FTP_SERVER login $FTP_USER password $FTP_PASS" > ~/.netrc
+          chmod 600 ~/.netrc
+
           echo "Downloading vendor feed from FTP..."
           curl --ftp-pasv \
+               --netrc \
                --retry 3 \
                --retry-delay 10 \
                --connect-timeout 30 \
                --max-time 300 \
-               -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
-               "ftp://${{ secrets.FTP_SERVER }}/${{ secrets.FTP_FILE_PATH }}" \
+               "ftp://$FTP_SERVER/$FTP_FILE_PATH" \
                -o ./BVDG-VET/vet-med-data-feed.csv
+
+          rm -f ~/.netrc
           echo "✓ Downloaded $(du -h ./BVDG-VET/vet-med-data-feed.csv | cut -f1) to ./BVDG-VET/vet-med-data-feed.csv"
 
       - name: Run pipeline (all products)
