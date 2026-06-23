@@ -152,8 +152,8 @@ Examples:
 
             import pandas as pd
             if len(pd.read_csv(input_feed)) == 0:
-                print("\n✅ No price or inventory changes since last run. Nothing to process.")
-                return 0
+                print("\n⚠ No price or inventory changes detected — falling back to full feed.")
+                input_feed = args.input
 
         # Stage 1: Optional animal filter
         if args.animals_only:
